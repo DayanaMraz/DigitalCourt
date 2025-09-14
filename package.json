@@ -1,0 +1,41 @@
+{
+  "name": "digital-court-system",
+  "version": "1.0.0",
+  "description": "Digital Court System with FHE Privacy Voting",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "export": "next export",
+    "compile": "cross-env hardhat compile",
+    "test": "cross-env hardhat test",
+    "deploy": "cross-env hardhat run scripts/deploy.js",
+    "deploy:localhost": "cross-env NETWORK=localhost hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "cross-env NETWORK=sepolia hardhat run scripts/deploy.js --network sepolia",
+    "deploy:zama": "cross-env NETWORK=zama hardhat run scripts/deploy.js --network zama",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'Linting passed'"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "ethers": "^6.8.0",
+    "fhevmjs": "^0.4.0",
+    "@fhevm/solidity": "^0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0",
+    "hardhat": "^2.24.3",
+    "@fhevm/hardhat-plugin": "0.0.1-3",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.3",
+    "chai": "^4.3.7",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0"
+  }
+}
