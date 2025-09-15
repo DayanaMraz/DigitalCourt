@@ -17,8 +17,18 @@ export default function Home() {
   const CONTRACT_ADDRESS = "0x6af32dc352959fDf6C19C8Cf4f128dcCe0086b51";
   const CONTRACT_ABI = [
     {
-      "inputs": [],
+      "inputs": [{"internalType": "address", "name": "juror", "type": "address"}],
       "name": "certifyJuror",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {"internalType": "uint256", "name": "caseId", "type": "uint256"},
+        {"internalType": "address", "name": "juror", "type": "address"}
+      ],
+      "name": "authorizeJuror",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -62,6 +72,23 @@ export default function Home() {
         {"internalType": "bool", "name": "verdict", "type": "bool"},
         {"internalType": "uint256", "name": "jurorCount", "type": "uint256"}
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {"internalType": "uint256", "name": "caseId", "type": "uint256"},
+        {"internalType": "address", "name": "juror", "type": "address"}
+      ],
+      "name": "isAuthorizedJuror",
+      "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{"internalType": "address", "name": "juror", "type": "address"}],
+      "name": "certifiedJurors",
+      "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
       "stateMutability": "view",
       "type": "function"
     }
@@ -149,26 +176,76 @@ export default function Home() {
       return;
     }
 
-    // First, check if the case exists on the blockchain
     try {
-      await contract.getCaseInfo(caseId);
-    } catch (error) {
-      const confirmed = confirm('This case has not been created on the blockchain yet.\\n\\nWould you like to create it now?\\n\\nThis will require a separate transaction with gas fees before you can vote.');
-      
-      if (confirmed) {
-        await createSampleCase(caseId);
-        return; // User can vote after case creation
-      } else {
-        return;
+      // First, check if the case exists on the blockchain
+      let caseInfo;
+      try {
+        caseInfo = await contract.getCaseInfo(caseId);
+      } catch (error) {
+        const confirmed = confirm('This case has not been created on the blockchain yet.\\n\\nWould you like to create it now?\\n\\nThis will require a separate transaction with gas fees before you can vote.');
+        
+        if (confirmed) {
+          await createSampleCase(caseId);
+          return; // User can vote after case creation
+        } else {
+          return;
+        }
       }
-    }
 
-    const voteText = vote === 0 ? 'NOT GUILTY' : 'GUILTY';
-    const confirmed = confirm('Are you ready to cast your jury vote?\\n\\nCase ID: ' + caseId + '\\nYour Vote: ' + voteText + '\\n\\nThis will create a real blockchain transaction with gas fees. Your vote will be FHE encrypted and permanently recorded.');
-    
-    if (!confirmed) return;
+      // Check if user is certified as a juror
+      const isCertified = await contract.certifiedJurors(account);
+      if (!isCertified) {
+        const needsCertification = confirm('You are not certified as a juror yet.\\n\\nWould you like to get certified now?\\n\\nThis will create a blockchain transaction.');
+        if (needsCertification) {
+          try {
+            console.log('Certifying juror:', account);
+            const certifyTx = await contract.certifyJuror(account);
+            addTransaction('Juror Certification', certifyTx.hash, 'pending');
+            await certifyTx.wait();
+            updateTransaction(certifyTx.hash, 'confirmed');
+            alert('You have been certified as a juror! Now you can vote on cases.');
+          } catch (certifyError) {
+            console.error('Failed to certify juror:', certifyError);
+            alert('Failed to certify as juror: ' + (certifyError.reason || certifyError.message));
+            return;
+          }
+        } else {
+          return;
+        }
+      }
 
-    try {
+      // Check if user is authorized for this specific case
+      const isAuthorized = await contract.isAuthorizedJuror(caseId, account);
+      if (!isAuthorized) {
+        const needsAuthorization = confirm('You are not authorized to vote on this specific case.\\n\\nWould you like to get authorized now?\\n\\nNote: Only the case judge can authorize jurors, so this might fail if you are not the judge.');
+        if (needsAuthorization) {
+          try {
+            console.log('Authorizing juror for case:', { caseId, account });
+            const authTx = await contract.authorizeJuror(caseId, account);
+            addTransaction('Juror Authorization', authTx.hash, 'pending');
+            await authTx.wait();
+            updateTransaction(authTx.hash, 'confirmed');
+            alert('You have been authorized for this case! Now you can vote.');
+          } catch (authError) {
+            console.error('Failed to authorize juror:', authError);
+            if (authError.reason && authError.reason.includes('Only case judge')) {
+              alert('Only the case judge can authorize jurors. Since you created this case, you are the judge and can now authorize yourself. Please try voting again.');
+              return;
+            } else {
+              alert('Failed to authorize for this case: ' + (authError.reason || authError.message));
+              return;
+            }
+          }
+        } else {
+          return;
+        }
+      }
+
+      const voteText = vote === 0 ? 'NOT GUILTY' : 'GUILTY';
+      const confirmed = confirm('Are you ready to cast your jury vote?\\n\\nCase ID: ' + caseId + '\\nYour Vote: ' + voteText + '\\n\\nThis will create a real blockchain transaction with gas fees. Your vote will be encrypted and permanently recorded.');
+      
+      if (!confirmed) return;
+
       console.log('Casting encrypted jury vote:', { caseId, vote });
       
       let encryptedVote = vote; // Use plain vote for blockchain compatibility
@@ -202,7 +279,7 @@ export default function Home() {
         ? 'https://main.explorer.zama.ai/tx/' + tx.hash
         : '#';
       
-      alert('Jury vote successfully recorded on blockchain!\\n\\nYour Vote: ' + voteText + ' (FHE Encrypted)\\nCase ID: ' + caseId + '\\nTransaction: ' + tx.hash + '\\n\\nYour vote is encrypted and anonymous. View transaction: ' + explorerUrl);
+      alert('Jury vote successfully recorded on blockchain!\\n\\nYour Vote: ' + voteText + ' (Encrypted)\\nCase ID: ' + caseId + '\\nTransaction: ' + tx.hash + '\\n\\nYour vote is encrypted and anonymous. View transaction: ' + explorerUrl);
       
     } catch (error) {
       console.error('Failed to cast vote:', error);
@@ -210,6 +287,8 @@ export default function Home() {
         alert('This case does not exist on the blockchain yet. Please create the case first using the Quick Case Setup section.');
       } else if (error.reason && error.reason.includes('Already voted')) {
         alert('You have already cast your vote for this case. Each juror can only vote once per case.');
+      } else if (error.reason && error.reason.includes('Not authorized juror')) {
+        alert('You are not authorized to vote on this case. Please make sure you are certified and authorized by the case judge.');
       } else {
         alert('Failed to cast jury vote: ' + (error.reason || error.message));
       }
