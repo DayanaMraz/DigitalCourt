@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import Head from 'next/head';
-import { createFhevmInstance } from 'fhevmjs';
+// Mock FHE functionality for Vercel compatibility
+const mockFhevmInstance = {
+  encrypt8: (value) => value, // Simple passthrough for demo
+  initialized: true
+};
 
 export default function Home() {
   const [account, setAccount] = useState('');
@@ -73,17 +77,11 @@ export default function Home() {
     
     setIsInitializingFHE(true);
     try {
-      // Create FHEVM instance for encryption
-      const instance = await createFhevmInstance({
-        chainId: 8009, // Zama devnet chainId
-        publicKeyId: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      });
-      setFhevmInstance(instance);
-      console.log('🔐 FHE instance initialized successfully');
+      // Use mock FHE instance for Vercel compatibility
+      setFhevmInstance(mockFhevmInstance);
+      console.log('🔐 Mock FHE instance initialized for demo purposes');
     } catch (error) {
-      console.error('Failed to initialize FHE:', error);
-      // Fallback for development without FHE
-      console.warn('Using development mode without real FHE encryption');
+      console.error('Failed to initialize mock FHE:', error);
     } finally {
       setIsInitializingFHE(false);
     }
@@ -173,19 +171,18 @@ export default function Home() {
     try {
       console.log('Casting encrypted jury vote:', { caseId, vote });
       
-      let encryptedVote;
-      if (fhevmInstance) {
-        // Use real FHE encryption
+      let encryptedVote = vote; // Use plain vote for blockchain compatibility
+      
+      if (fhevmInstance && fhevmInstance.encrypt8) {
         try {
+          // Use mock encryption for demo (in production this would be real FHE)
           encryptedVote = fhevmInstance.encrypt8(vote);
-          console.log('🔐 Vote encrypted with FHE');
-        } catch (fheError) {
-          console.warn('FHE encryption failed, using fallback:', fheError);
-          encryptedVote = vote; // Fallback to plain vote
+          console.log('🔐 Vote encrypted with mock FHE for demo purposes');
+        } catch (error) {
+          console.warn('Mock encryption failed, using plain vote:', error);
         }
       } else {
-        console.warn('FHE not initialized, using plain vote');
-        encryptedVote = vote; // Fallback to plain vote
+        console.warn('Using plain vote - in production this would be FHE encrypted');
       }
       
       // Generate cryptographic commitment hash for vote privacy
@@ -336,13 +333,13 @@ export default function Home() {
             </p>
             <p><strong>Encryption:</strong> 
               {fhevmInstance ? 
-                <span style={{color: '#22c55e'}}>✅ FHE Ready (Real Encryption)</span> : 
+                <span style={{color: '#22c55e'}}>✅ Mock FHE Ready (Demo Mode)</span> : 
                 isInitializingFHE ?
-                <span style={{color: '#f59e0b'}}>🔄 Initializing FHE...</span> :
-                <span style={{color: '#ef4444'}}>⚠️ FHE Not Available (Development Mode)</span>
+                <span style={{color: '#f59e0b'}}>🔄 Initializing...</span> :
+                <span style={{color: '#ef4444'}}>⚠️ Not Available</span>
               }
             </p>
-            <p><strong>Privacy Level:</strong> {fhevmInstance ? 'Maximum (FHE)' : 'Basic (Commitment Scheme)'}</p>
+            <p><strong>Privacy Level:</strong> {fhevmInstance ? 'Demo (Mock Encryption + Commitment)' : 'Basic (Commitment Scheme)'}</p>
           </div>
         </div>
 
